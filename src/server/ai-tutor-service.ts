@@ -95,9 +95,26 @@ CRITICAL PEDAGOGICAL RULES:
    - "Quiz Me": Provide one targeted conceptual multiple-choice question to test understanding.
    - "Practice": Provide a step-by-step problem with a hint.
    - "Give Hint": Provide a scaffolded hint without spoiling the complete solution.
-   - "Explain Visually": Use ASCII boxes or text diagrams.`;
+   - "Explain Visually": Use ASCII boxes or text diagrams.
+4. FORMATTING: Never use LaTeX or math markup like $...$, \\(...\\), \\text{...}, \\frac{}{}, or similar. Write all math in plain, readable text instead — e.g. "P(Bug | Flag)" not "$P(\\text{Bug}|\\text{Flag})$", and "1/3" or "a fraction" instead of \\frac. Use **bold** and bullet points for structure, never markdown math syntax.`;
 
   const ai = getAIClient();
+
+  // Safety net: even with the formatting rule above, models occasionally slip
+  // back into LaTeX. Strip the common delimiters/macros so raw "$...$" or
+  // "\text{...}" never reaches the chat UI, which has no LaTeX renderer.
+  const sanitizeMathNotation = (text: string): string =>
+    text
+      .replace(/\\\(|\\\)|\\\[|\\\]/g, '')
+      .replace(/\$\$?/g, '')
+      .replace(/\\text\{([^}]*)\}/g, '$1')
+      .replace(/\\frac\{([^}]*)\}\{([^}]*)\}/g, '($1)/($2)')
+      .replace(/\\times/g, '×')
+      .replace(/\\cdot/g, '·')
+      .replace(/\\approx/g, '≈')
+      .replace(/\\le/g, '≤')
+      .replace(/\\ge/g, '≥')
+      .replace(/\\[a-zA-Z]+/g, '');
 
   // Guards against a hung/slow AI call outliving the browser's or a proxy's
   // request timeout (which would surface as a raw network error on the client
@@ -135,7 +152,7 @@ Respond as LearnTwin AI Tutor:`;
       );
 
       if (response.text && response.text.trim()) {
-        return response.text.trim();
+        return sanitizeMathNotation(response.text.trim());
       }
     } catch (err) {
       console.warn('AI API primary call failed, trying fallback model:', err);
@@ -150,7 +167,7 @@ Respond as LearnTwin AI Tutor:`;
           15000
         );
         if (response2.text && response2.text.trim()) {
-          return response2.text.trim();
+          return sanitizeMathNotation(response2.text.trim());
         }
       } catch (err2) {
         console.warn('AI API secondary call failed, using twin-aware contextual fallback:', err2);
